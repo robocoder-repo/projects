@@ -19,6 +19,7 @@ exports.createUser = async (req, res) => {
         }
         const user = await User.create(req.body);
         logger.info(`User created: ${user.email}`);
+        logger.info(`User created: ${user.email}`);
         res.status(201).json(user);
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -29,6 +30,78 @@ const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+const speakeasy = require('speakeasy');
+
+// Send 2FA code
+exports.send2FACode = async (req, res) => {
+    try {
+        const { email } = req.body;
+        const user = await User.findOne({ where: { email } });
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const secret = speakeasy.generateSecret({ length: 20 });
+        user.twoFactorSecret = secret.base32;
+        await user.save();
+
+        const token = speakeasy.totp({
+            secret: user.twoFactorSecret,
+            encoding: 'base32'
+        });
+
+        const transporter = nodemailer.createTransport({
+            service: 'Gmail',
+            auth: {
+                user: process.env.EMAIL,
+                pass: process.env.EMAIL_PASSWORD,
+            },
+        });
+
+        const mailOptions = {
+            to: user.email,
+            from: process.env.EMAIL,
+            subject: 'Your 2FA Code',
+            text: `Your 2FA code is: ${token}`,
+        };
+
+        await transporter.sendMail(mailOptions);
+        logger.info(`2FA code sent to: ${user.email}`);
+        res.status(200).json({ message: '2FA code sent' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+// Verify 2FA code
+exports.verify2FACode = async (req, res) => {
+    try {
+        const { email, token } = req.body;
+        const user = await User.findOne({ where: { email } });
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const verified = speakeasy.totp.verify({
+            secret: user.twoFactorSecret,
+            encoding: 'base32',
+            token,
+            window: 1
+        });
+
+        if (!verified) {
+            return res.status(400).json({ error: 'Invalid 2FA code' });
+        }
+
+        const jwtToken = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        logger.info(`2FA code verified for: ${user.email}`);
+        res.status(200).json({ token: jwtToken });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
 
 // Role-based access control
 exports.checkPermissions = (requiredPermissions) => {
@@ -61,6 +134,7 @@ exports.login = async (req, res) => {
         }
 
         const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        logger.info(`User logged in: ${user.email}`);
         res.status(200).json({ token });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -116,6 +190,7 @@ exports.initiatePasswordReset = async (req, res) => {
         };
 
         await transporter.sendMail(mailOptions);
+        logger.info(`Password reset initiated for: ${user.email}`);
         res.status(200).json({ message: 'Password reset email sent' });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -142,6 +217,7 @@ exports.completePasswordReset = async (req, res) => {
         user.resetTokenExpiry = null;
         await user.save();
 
+        logger.info(`Password reset completed for: ${user.email}`);
         res.status(200).json({ message: 'Password has been reset' });
     } catch (error) {
         res.status(500).json({ error: error.message });

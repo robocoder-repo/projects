@@ -27,4 +27,8 @@ router.post('/users/refresh-token', userController.refreshToken);
 // User login route
 router.post('/users/login', userController.login);
 
+// 2FA routes
+router.post('/users/send-2fa-code', userController.send2FACode);
+router.post('/users/verify-2fa-code', userController.verify2FACode);
+
 module.exports = router;
