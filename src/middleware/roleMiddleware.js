@@ -10,6 +10,12 @@ const limiter = rateLimit({
     message: 'Too many requests from this IP, please try again later'
 });
 
+const rolesPermissions = {
+    admin: ['createProject', 'manageUsers', 'manageTasks', 'viewReports'],
+    manager: ['manageProjects', 'manageTasks', 'viewReports', 'viewProjectDetails'],
+    member: ['viewTasks', 'updateTasks', 'comment'],
+};
+
 const checkRole = (roles) => {
     return (req, res, next) => {
         const token = req.headers['authorization'];

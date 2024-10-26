@@ -27,7 +27,45 @@ exports.createUser = async (req, res) => {
 
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
+const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
+
+// Role-based access control
+exports.checkPermissions = (requiredPermissions) => {
+    return (req, res, next) => {
+        const { role } = req.user;
+        const userPermissions = rolesPermissions[role] || [];
+
+        const hasPermission = requiredPermissions.every(permission => userPermissions.includes(permission));
+        if (!hasPermission) {
+            return res.status(403).json({ error: 'You do not have permission to access this resource' });
+        }
+
+        next();
+    };
+};
+
+// User login and token generation
+exports.login = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const user = await User.findOne({ where: { email } });
+
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const isMatch = await user.comparePassword(password);
+        if (!isMatch) {
+            return res.status(400).json({ error: 'Invalid password' });
+        }
+
+        const token = jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
+        res.status(200).json({ token });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
 
 exports.getUsers = async (req, res) => {
     try {
