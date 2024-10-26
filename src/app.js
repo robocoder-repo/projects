@@ -2,6 +2,17 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const sequelize = require('../config/database');
+const winston = require('winston');
+
+// Logger setup
+const logger = winston.createLogger({
+    level: 'info',
+    format: winston.format.json(),
+    transports: [
+        new winston.transports.Console(),
+        new winston.transports.File({ filename: 'combined.log' })
+    ]
+});
 require('dotenv').config();
 
 const app = express();
@@ -18,6 +29,12 @@ sequelize.authenticate()
 const projectRoutes = require('./routes/projectRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const userRoutes = require('./routes/userRoutes');
+
+// Centralized Error Handling Middleware
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).json({ error: 'Something went wrong!' });
+});
 
 // Routes
 app.use('/api', projectRoutes);

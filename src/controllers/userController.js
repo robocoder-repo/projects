@@ -3,6 +3,10 @@ const User = require('../models/user');
 
 exports.createUser = async (req, res) => {
     try {
+        // Validation logic
+        if (!req.body.name || !req.body.email || !req.body.password) {
+            return res.status(400).json({ error: 'Name, email, and password are required' });
+        }
         const user = await User.create(req.body);
         res.status(201).json(user);
     } catch (error) {

@@ -4,6 +4,10 @@ const Task = require('../models/task');
 
 exports.createProject = async (req, res) => {
     try {
+        // Validation logic
+        if (!req.body.name) {
+            return res.status(400).json({ error: 'Project name is required' });
+        }
         const project = await Project.create(req.body);
         res.status(201).json(project);
     } catch (error) {
